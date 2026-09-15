@@ -1,0 +1,96 @@
+---
+title: "Agricultural Analysis"
+format: html
+editor: visual
+---
+
+![]()
+
+## Read in Data
+
+```{r}
+library(tidyverse)
+library(sf)
+library(here)
+library(mapview)
+library(RColorBrewer)
+```
+
+```{r}
+
+ag_2015 <- st_read(here("data/Agricultural_Land_Use_2015_Baseline.geojson"))
+
+
+```
+
+```{r}
+
+ag_2020 <- st_read(here("data/Agricultural_Land_Use_2020_Update.geojson"))
+
+```
+
+## Potential Questions
+
+Histogram of acreage
+
+crops by island
+
+island map of color by crop
+
+```{r}
+
+
+```
+
+## Make a Map
+
+```{r}
+mapview(ag_2015, zcol = "cropcatego")
+```
+
+### After looking at our mapview map, the map color scale 
+
+## isn't that helpful to us... use r color brewer to change palette
+
+```{r}
+
+
+
+```
+
+## Distribution of Acreage
+
+```{r}
+ggplot(ag_2015, aes(x = acreage)) +
+  geom_histogram() +
+  theme_bw() + 
+  facet_wrap(~island, scales = "free_y")
+
+
+```
+
+Questions:
+
+when you have 2 datasets what do you do... Compare them
+
+Did we add crop acreage or lose crop acreage from 2015-2020?
+
+```{r}
+
+sum_2015_acreage <- sum(ag_2015$acreage)
+sum_2020_acreage <- sum(ag_2020$acreage)
+
+sum_2020_acreage - sum_2015_acreage 
+```
+
+Questions to ask from our loss from 2020-2015:
+
+-   what has that land been converted to
+
+\*We could make a map of lost ag land between 2015-2020
+
+ag land ownership
+
+NDVI in lost ag land
+
+soil type
