@@ -14,6 +14,7 @@ library(sf)
 library(here)
 library(mapview)
 library(RColorBrewer)
+library(tidytext)
 ```
 
 ```{r}
@@ -33,12 +34,30 @@ ag_2020 <- st_read(here("data/Agricultural_Land_Use_2020_Update.geojson"))
 
 Histogram of acreage
 
+```{r}
+ggplot(data = ag_2015, aes(x = acreage, fill = island)) +
+  geom_histogram(bins = 50) +
+  scale_x_log10() +
+  theme_classic()
+
+```
+
 crops by island
 
-island map of color by crop
-
 ```{r}
+crop_island <- ag_2020 %>%
+  st_drop_geometry() %>%
+  group_by(island, crops_2020) %>%
+  summarize(acres = sum(acreage)) %>%
+  filter(crops_2020 != "Pasture", island != "Lanai")
 
+ggplot(crop_island, aes(x = acres, y = reorder(crops_2020, acres, sum))) +
+  geom_col(fill = "darkgreen") +
+  facet_wrap(~island, scales = "free", ncol = 2) +
+  scale_x_continuous(labels = scales::comma) +
+  labs(x = "Acres", y = NULL) +
+  theme_bw() +
+  theme(axis.text.y = element_text(size = 7))
 
 ```
 
@@ -46,14 +65,17 @@ island map of color by crop
 
 ```{r}
 mapview(ag_2015, zcol = "cropcatego")
+
 ```
 
-### After looking at our mapview map, the map color scale 
+### After looking at our mapview map, the map color scale
 
 ## isn't that helpful to us... use r color brewer to change palette
 
 ```{r}
 
+mapview(ag_2015, zcol = "cropcatego",
+        col.regions = colorRampPalette(brewer.pal(12, "Paired")))
 
 
 ```
@@ -61,13 +83,29 @@ mapview(ag_2015, zcol = "cropcatego")
 ## Distribution of Acreage
 
 ```{r}
-ggplot(ag_2015, aes(x = acreage)) +
-  geom_histogram() +
-  theme_bw() + 
-  facet_wrap(~island, scales = "free_y")
+ggplot(ag_2020, aes(x = acreage)) +
+  geom_histogram(fill = "darkgreen", color = "white") +
+  scale_x_log10(breaks = c(1, 10, 100, 1000, 10000, 100000), labels = scales::comma) +
+  labs(x = "Plot size (acres)", y = "Number of plots") +
+  theme_bw()
+
+
 
 
 ```
+
+island map of color by crop
+
+```{r}
+
+pcrops <- ag_2020 %>% filter(crops_2020 != "Pasture")
+
+mapview(crops, zcol = "crops_2020",
+        col.regions = colorRampPalette(brewer.pal(12, "Paired")),
+        layer.name = "Crop")
+
+```
+
 
 Questions:
 
@@ -81,13 +119,15 @@ sum_2015_acreage <- sum(ag_2015$acreage)
 sum_2020_acreage <- sum(ag_2020$acreage)
 
 sum_2020_acreage - sum_2015_acreage 
+
+
 ```
 
 Questions to ask from our loss from 2020-2015:
 
--   what has that land been converted to
+what has that land been converted to?
 
-\*We could make a map of lost ag land between 2015-2020
+We could make a map of lost ag land between 2015-2020
 
 ag land ownership
 
