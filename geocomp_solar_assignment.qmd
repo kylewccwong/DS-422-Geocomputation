@@ -1,0 +1,254 @@
+---
+title: "Geocomp_Solar_Assignment"
+format: html
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(tidycensus)
+library(here)
+library(sf)
+library(mapview)
+library(mapgl)
+
+```
+
+Read in Solar Panel Data
+
+```{r}
+solar_predictions <- st_read(here("data/oahu_solar_dedup_simple.geojson"))
+```
+
+Summary Stats Code Head- first 6 obs glimpse-more extensive, gives variable type summary- stats on each variable
+
+```{r}
+head(solar_predictions)
+glimpse(solar_predictions)
+summary(solar_predictions)
+
+```
+
+Quick filter to get clean out all NA and NA variations
+
+```{r}
+
+solar_predictions <- solar_predictions %>%
+  mutate(across(where(is.character), function(x) replace(x, x %in% c("na", "N/A", ""), NA)))
+
+```
+
+Quick map to checkout solar panels on Oahu map
+
+```{r}
+
+mapview(solar_predictions)
+
+```
+
+Pulling American Survey data to checkout median household data for Hawaii
+
+```{r}
+oahu_med_household_income <- get_acs(
+  geography = "tract",
+  variables = "B19013_001",  # median household income(Google this)
+  state = "HI",
+  county = "Honolulu",
+  geometry = TRUE,
+  year = 2022
+)
+```
+
+Map of Oahu showing median household income by census tract
+
+```{r}
+mapview(oahu_med_household_income, zcol = "estimate", col.regions = hcl.colors(9, "Greens", rev = TRUE))
+  
+```
+
+st_is_empty : when !is at the start of a function it means the opposite so its saying in solar_predictions\[keep the geometries that are NOT empty\] st_is_empty says to keep and save if st_is_empty, the ! flips the statement
+
+st_make_valid : fixes geometries that maybe overlap or don't look right; maybe they crossover in a weird way
+
+```{r}
+
+solar_predictions <- solar_predictions[!st_is_empty(solar_predictions), ]
+solar_predictions <- st_make_valid(solar_predictions)
+
+```
+
+Might as well make Our median income df valid as well (keep methods the same)
+
+```{r}
+oahu_med_household_income <- st_make_valid(oahu_med_household_income)
+
+```
+
+st_transform: function for the purpose of a JOIN function. need to be on the same st_crs CRS-Coordinate Reference System. st_transform converts solar_predictions into oahu_med_household_income geometry. st_crs() before oahu_med_household_income tells st_transform what crs its using
+
+```{r}
+solar_predictions <- st_transform(solar_predictions, st_crs(oahu_med_household_income))
+
+```
+
+Claude- splits our rows into batches of 5000
+
+```{r}
+
+n <- nrow(solar_predictions)
+batch_size <- 5000
+batch_ids <- split(1:n, ceiling(seq_along(1:n) / batch_size))
+
+```
+
+For loop to process all solar predictions
+
+```{r}
+results <- vector("list", length(batch_ids))
+
+for (i in seq_along(batch_ids)) {
+  rows <- batch_ids[[i]]
+  results[[i]] <- st_join(solar_predictions[rows, ], oahu_med_household_income, join = st_intersects, largest = TRUE)
+  cat("Batch", i, "of", length(batch_ids), "done\n")
+}
+
+solar_with_tract <- bind_rows(results)
+
+```
+
+-turns tract to tract_proj by changing its crs \*\*which only changes geometry -each crs has its own iD number, and 32604 is the meters system for Hawaii -our goal rn is to get area_m2 at census tract level
+
+```{r}
+
+solar_with_tract_proj <- st_transform(solar_with_tract, 32604)
+
+```
+
+-create new variable area_m2_recalc. gets area of each individ 82k solar panels -after that it takes off the from m2 unit tag and makes it an int
+
+```{r}
+
+solar_with_tract_proj <- solar_with_tract_proj %>%
+  mutate(area_m2_recalc = as.numeric(st_area(geometry)))
+
+```
+
+-We remove the geometry column because it makes our processing much slower and prevent any calculation errors -group by GEOID or our census tract -gives total area_m2 per tract -why is it important? Now we can normalize and do per stats
+
+```{r}
+
+tract_summary <- solar_with_tract_proj %>%
+  st_drop_geometry() %>%
+  group_by(GEOID) %>%
+  summarise(total_solar_area_m2 = sum(area_m2_recalc, na.rm = TRUE))
+
+```
+
+-remake final med income df, and keeping and renaming variables -displays total area in m2 and median household income data per tract
+
+```{r}
+
+final_med_income <- mutate(
+  left_join(
+  select(oahu_med_household_income, GEOID, NAME, median_income = estimate, income_moe = moe),
+  tract_summary, by = "GEOID"),
+  total_solar_area_m2 = round(replace_na(total_solar_area_m2, 0),0)
+)
+```
+
+zcol tells it to color by total solar area m2, and interactive income display is automatic
+
+correlation coefficient method spearman- better of the 2 because it finds correlation through rankings... helps to avoid influence of outliers
+
+Split panels into quantiles so we can see outliers (assumed solar farms), we can organize by specific percentiles
+
+```{r}
+quantile(solar_with_tract_proj$area_m2_recalc, 
+         probs = c(0.9, 0.95, 0.99, 0.999), na.rm = TRUE)
+
+```
+
+Farm filtering step.. filter for panels bigger than 1000(99.5% percentile)
+
+```{r}
+farm_candidates <- solar_with_tract_proj %>%
+  st_drop_geometry() %>%
+  filter(area_m2_recalc > 1000) %>%
+  group_by(GEOID) %>%
+  summarise(n_large_detections = n(),
+            total_large_area_m2 = sum(area_m2_recalc, na.rm = TRUE)) %>%
+  arrange(desc(total_large_area_m2))
+```
+
+New data frame post getting rid of the large solar panels. It's possible that these may not literally be solar farms, but our question is about median household income. If the total area m2 of a solar panel is within the top 0.05%, it is likely not representative of the standard home anyway.
+
+```{r}
+rooftop_only <- solar_with_tract_proj %>%
+  st_drop_geometry() %>%
+  filter(!(GEOID %in% farm_tracts & area_m2_recalc > 1000)) %>%
+  group_by(GEOID) %>%
+  summarise(rooftop_solar_area_m2 = round(sum(area_m2_recalc, na.rm = TRUE)))
+```
+
+Pulls total households in each tract
+
+```{r}
+oahu_households <- get_acs(
+  geography = "tract",
+  variables = "B11001_001", #Total household variable code
+  state = "HI",
+  county = "Honolulu",
+  year = 2022
+) %>%
+  rename(households = estimate) %>%
+  select(GEOID, households)
+```
+
+grabs total area m2 of solar per household
+
+```{r}
+final_med_income <- final_med_income %>%
+  left_join(rooftop_only, by = "GEOID") %>%
+  left_join(oahu_households, by = "GEOID") %>%
+  mutate(rooftop_solar_area_m2 = replace_na(rooftop_solar_area_m2, 0),
+         solar_per_household = if_else(households > 0, round(rooftop_solar_area_m2 / households, 2), NA_real_))
+```
+
+-map of area of rooftop solar per household by tract -panels over 1000 area m2 removed -normalized to consider larger census tracts
+
+```{r}
+mapview(final_med_income, zcol = "solar_per_household",
+        col.regions = hcl.colors(8, "Greens", rev = TRUE),
+        at = quantile(final_med_income$solar_per_household, probs = seq(0, 1, 0.125), na.rm = TRUE))
+
+```
+
+-map of total solar area by tract -no filtering of anything
+
+```{r}
+mapview(final_med_income, zcol = "total_solar_area_m2", col.regions = hcl.colors(9, "Greens", rev = TRUE))
+cor.test(final_med_income$median_income, final_med_income$total_solar_area_m2, 
+         method = "spearman", use = "complete.obs")
+
+```
+
+pearsons coefficient- less effective.. finds correlation using numbers.. can be heavily influenced by outliers
+
+```{r}
+
+cor.test(final_med_income$median_income, final_med_income$total_solar_area_m2, 
+         method = "pearson", use = "complete.obs")
+
+```
+
+Scatter plot- Each dot is a census tract. We can see the relationship between median household income and total solar area m2 per census tract
+
+```{r}
+
+ggplot(data = final_med_income, aes(x = median_income, y = total_solar_area_m2)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm", color = "red") +
+  labs(title = "Solar Detection Area vs. Median Household Income by Tract",
+       x = "Median Household Income ($)",
+       y = "Total Solar Detection Area (m²)")
+```
