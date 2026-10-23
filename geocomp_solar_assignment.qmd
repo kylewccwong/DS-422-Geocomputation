@@ -120,16 +120,7 @@ solar_with_tract <- bind_rows(results)
 
 ```{r}
 
-solar_with_tract_proj <- st_transform(solar_with_tract, 32604)
-
-```
-
--create new variable area_m2_recalc. gets area of each individ 82k solar panels -after that it takes off the from m2 unit tag and makes it an int
-
-```{r}
-
-solar_with_tract_proj <- solar_with_tract_proj %>%
-  mutate(area_m2_recalc = as.numeric(st_area(geometry)))
+solar_with_tract <- st_transform(solar_with_tract, 32604)
 
 ```
 
@@ -137,10 +128,10 @@ solar_with_tract_proj <- solar_with_tract_proj %>%
 
 ```{r}
 
-tract_summary <- solar_with_tract_proj %>%
+tract_summary <- solar_with_tract %>%
   st_drop_geometry() %>%
   group_by(GEOID) %>%
-  summarise(total_solar_area_m2 = sum(area_m2_recalc, na.rm = TRUE))
+  summarise(total_solar_area_m2 = sum(area_m2, na.rm = TRUE))
 
 ```
 
@@ -156,38 +147,34 @@ final_med_income <- mutate(
 )
 ```
 
-zcol tells it to color by total solar area m2, and interactive income display is automatic
-
-correlation coefficient method spearman- better of the 2 because it finds correlation through rankings... helps to avoid influence of outliers
-
 Split panels into quantiles so we can see outliers (assumed solar farms), we can organize by specific percentiles
 
 ```{r}
-quantile(solar_with_tract_proj$area_m2_recalc, 
-         probs = c(0.9, 0.95, 0.99, 0.999), na.rm = TRUE)
+quantile(solar_with_tract$area_m2, 
+         probs = c(0.9, 0.95, 0.99, 0.995, 0.999), na.rm = TRUE)
 
 ```
 
-Farm filtering step.. filter for panels bigger than 1000(99.5% percentile)
-
-```{r}
-farm_candidates <- solar_with_tract_proj %>%
-  st_drop_geometry() %>%
-  filter(area_m2_recalc > 1000) %>%
-  group_by(GEOID) %>%
-  summarise(n_large_detections = n(),
-            total_large_area_m2 = sum(area_m2_recalc, na.rm = TRUE)) %>%
-  arrange(desc(total_large_area_m2))
-```
+Farm filtering step.. filter for panels bigger than 1000
 
 New data frame post getting rid of the large solar panels. It's possible that these may not literally be solar farms, but our question is about median household income. If the total area m2 of a solar panel is within the top 0.05%, it is likely not representative of the standard home anyway.
 
 ```{r}
-rooftop_only <- solar_with_tract_proj %>%
+farm_candidates <- solar_with_tract %>%
   st_drop_geometry() %>%
-  filter(!(GEOID %in% farm_tracts & area_m2_recalc > 1000)) %>%
+  filter(area_m2 > 1000) %>%
   group_by(GEOID) %>%
-  summarise(rooftop_solar_area_m2 = round(sum(area_m2_recalc, na.rm = TRUE)))
+  summarise(n_large_detections = n(),
+            total_large_area_m2 = sum(area_m2, na.rm = TRUE)) %>%
+  arrange(desc(total_large_area_m2))
+```
+
+```{r}
+rooftop_only <- solar_with_tract %>%
+  st_drop_geometry() %>%
+  filter(!(area_m2 > 1000)) %>%
+  group_by(GEOID) %>%
+  summarise(rooftop_solar_area_m2 = round(sum(area_m2, na.rm = TRUE)))
 ```
 
 Pulls total households in each tract
@@ -225,6 +212,10 @@ mapview(final_med_income, zcol = "solar_per_household",
 
 -map of total solar area by tract -no filtering of anything
 
+zcol tells it to color by total solar area m2, and interactive income display is automatic
+
+correlation coefficient method spearman- better of the 2 because it finds correlation through rankings... helps to avoid influence of outliers
+
 ```{r}
 mapview(final_med_income, zcol = "total_solar_area_m2", col.regions = hcl.colors(9, "Greens", rev = TRUE))
 cor.test(final_med_income$median_income, final_med_income$total_solar_area_m2, 
@@ -236,7 +227,7 @@ pearsons coefficient- less effective.. finds correlation using numbers.. can be 
 
 ```{r}
 
-cor.test(final_med_income$median_income, final_med_income$total_solar_area_m2, 
+cor.test(final_med_income$median_income, final_med_income$solar_per_household, 
          method = "pearson", use = "complete.obs")
 
 ```
@@ -244,11 +235,11 @@ cor.test(final_med_income$median_income, final_med_income$total_solar_area_m2,
 Scatter plot- Each dot is a census tract. We can see the relationship between median household income and total solar area m2 per census tract
 
 ```{r}
-
-ggplot(data = final_med_income, aes(x = median_income, y = total_solar_area_m2)) +
+ggplot(data = final_med_income, aes(x = median_income, y = solar_per_household)) +
   geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", color = "red") +
-  labs(title = "Solar Detection Area vs. Median Household Income by Tract",
+  scale_y_log10() +  
+  labs(title = "Rooftop Solar per Household vs. Median Household Income by Tract",  
        x = "Median Household Income ($)",
-       y = "Total Solar Detection Area (m²)")
+       y = "Solar per Household (m², log scale)") 
 ```
