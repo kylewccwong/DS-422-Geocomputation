@@ -196,7 +196,7 @@ m
 
 Challenge 1: Recreate [this figure](https://github.com/jamgreen/lehdr/blob/master/vignettes/figures/fig1_balt_self_containment.png) for Hawaii
 
-Pull Hawaii Data
+Relevant Libraries
 
 ```{r}
 library(ggplot2)
@@ -208,6 +208,12 @@ library(mapview)
 options(tigris_use_cache = TRUE)
 
 ```
+
+Hawaii
+
+-   Home-to-work data(job types, self containment/job movements)
+
+-   Calculate self containment for each tract
 
 ```{r}
 
@@ -225,16 +231,22 @@ hi_commute <- compute_commute_stats(hi_od_tbl, agg_geo = "tract")
 
 ```
 
+Get tract shapes for Oahu
+
 ```{r}
 
 oahu_tracts <- tracts(state = "HI", county = "003", cb = TRUE, year = 2022)
 
 ```
 
+Assign each tract(across all islands-436)....what Hawaii tracts flow into Oahu tracts
+
 ```{r}
 oahu_sc <- oahu_tracts %>%
   inner_join(hi_commute, by = c("GEOID" = "tract"))
 ```
+
+Map
 
 ```{r}
 ggplot(oahu_sc) +
@@ -245,34 +257,75 @@ ggplot(oahu_sc) +
        subtitle = "Share of employed residents who also work within the same Census tract",
        fill = "Self-\nContainment") +
   theme_void()
-```
-
-```{r}
 
 ```
 
-```{r}
-
-```
+Interactive map
 
 ```{r}
 
+oahu_crop <- st_crop(oahu_sc, xmin = -158.3, xmax = -157.6, ymin = 21.25, ymax = 21.72)
+
+mapview(oahu_crop, zcol = "self_containment",
+        col.regions = colorRampPalette(c("lightyellow", "orange", "darkred")))
 ```
 
 Challenge 2: Recreate t[his figure](https://github.com/jamgreen/lehdr/blob/master/vignettes/figures/fig2_md_job_change.png) for a state of your choosing
 
-```{r}
+Pull Texas job data for years 2010 and 2019
 
+```{r}
+tx_wac <- grab_lodes(
+  state      = "tx",
+  year       = c(2010, 2019),
+  lodes_type = "wac",
+  job_type   = "JT00",
+  segment    = "S000",
+  agg_geo    = "county"
+)
 ```
 
+Use compute_lodes_change() function to calculate percentage change
+
 ```{r}
 
+tx_change <- compute_lodes_change(
+  tx_wac,
+  geo_col      = "w_county",
+  base_year    = 2010,
+  compare_year = 2019,
+  variables    = "C000"
+)
 ```
 
+Get county shapes for Texas and do inner join to match county change data with specific counties
+
 ```{r}
 
+tx_counties <- counties(state = "TX", cb = TRUE, year = 2019)
+
+tx_map <- tx_counties %>%
+  inner_join(tx_change, by = c("GEOID" = "w_county"))
 ```
 
-```{r}
+Map
 
+```{r}
+ggplot(tx_map) +
+  geom_sf(aes(fill = C000_pct_change), color = "gray") +
+    scale_fill_gradient2(low = "red", mid = "white", high = "blue", midpoint = 0,
+                       limits = c(-50, 50), oob = scales::squish) +
+  labs(title = "Change in total jobs, Texas counties",
+       subtitle = "Percent change in jobs from 2010 to 2019",
+       fill = "% change") +
+  theme_void()
+```
+
+Interactive Map
+
+```{r}
+tx_map$pct_capped <- pmin(pmax(tx_map$C000_pct_change, -50), 50)
+
+mapview(tx_map, zcol = "pct_capped",
+        col.regions = colorRampPalette(c("red", "white", "blue")))
 ```
