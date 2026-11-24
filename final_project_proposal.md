@@ -1,8 +1,8 @@
 # DS 422 Geocomputation – Final Project Proposal
  
-**Name:**
+Kyle Wong
  
-**Date:**
+11/24/26
  
 ---
  
@@ -18,8 +18,7 @@ What do you want to find out? Phrase it as a question. Mention the place and tim
  
 <!-- Write your answer below this line -->
  
- 
- 
+ I hope to continue my research and analysis on Aloha Harvest for my final project. I could do my project on pickups spread out across the island and measure that with ACS data to see whether the pickups are going to the places that need it the most. American Commmunity Survey data has information on household SNAP usage, poverty rate, median household income. Another layer to add that might be interesting outside of the financially vulnerable population is the physically vulnerable i.e. certain age groups(very old and very young), people with disabilities, limited-english speaking households, etc. 
  
  
 ---
@@ -30,7 +29,7 @@ List each dataset and where it comes from (agency, website, link). Note the form
  
 <!-- Write your answer below this line -->
  
- 
+ We will use our CSV that Victoria prepared for us. 
  
  
  
@@ -43,7 +42,7 @@ What methods will you actually run? For example, image segmentation, spatial sta
 <!-- Write your answer below this line -->
  
  
- 
+ I think our Isochrone data would fit somewhere in our analysis here. I have to flesh out my plan a little more but I think that ties well with vulnerable population data and routing. 
  
  
 ---
