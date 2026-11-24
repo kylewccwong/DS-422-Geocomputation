@@ -17,6 +17,8 @@ Download this file and add it to your DS422 Repository, then edit right in the g
 What do you want to find out? Phrase it as a question. Mention the place and time period if they are relevant.
  
 <!-- Write your answer below this line -->
+
+"Is Rescued Food Reaching Oahu's Most Vulnerable Populations?"
  
  I hope to continue my research and analysis on Aloha Harvest for my final project. I could do my project on pickups spread out across the island and measure that with ACS data to see whether the pickups are going to the places that need it the most. American Commmunity Survey data has information on household SNAP usage, poverty rate, median household income. Another layer to add that might be interesting outside of the financially vulnerable population is the physically vulnerable i.e. certain age groups(very old and very young), people with disabilities, limited-english speaking households, etc. 
  
