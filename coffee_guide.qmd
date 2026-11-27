@@ -98,7 +98,7 @@ How can we map some spatial information describing your potential customers. Use
 Within the get_acs() function think of putting in some of these variable codes based on what is most relevant to your coffee shop (***4 points***)
 
 | Code | Name in script | What it measures | Universe (denominator) |
-|----|----|----|----|
+|------------------|------------------|------------------|------------------|
 | B01001_001 | `total_pop` | Total population | All residents |
 | B01001_007 | `m_18_19` | Male, 18–19 years | All residents |
 | B01001_008 | `m_20` | Male, 20 years | All residents |
@@ -128,7 +128,7 @@ Within the get_acs() function think of putting in some of these variable codes b
 | B15003_025 | `doctorate` | Doctorate degree | Population 25+ |
 | B25064_001 | `med_gross_rent` | Median gross rent (residential, rent + utilities) | Renter-occupied units paying cash rent |
 
-As mentioned earlier, I would focus on reaching a younger crowd, making the selling point of the shop affordability. I decided to display census tract data by our target audience(ages 18-30) and median household income. This gave me a better idea of how well our location fit our marketing strategy.
+As mentioned earlier, I would focus on reaching a younger crowd, making the selling point of the shop affordability. I decided to display census tract data by our target audience(ages 18-30) and median household rent This gave me a better idea of how well our location fit our marketing strategy.
 
 ```{r}
 library(tidycensus)
